@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: Auto-start and auto-stop EC2 instances using Lambda and EventBridge.
+
+Resources:
+
+  # 🚀 Auto-Stop Lambda Function
+  AutoStopEC2Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: autostop.lambda_handler
+      Runtime: python3.12
+      Timeout: 60
+      CodeUri: ./  # Points to the root folder where autostop.py exists
+      Policies:
+        - AmazonEC2ReadOnlyAccess
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Sid: AllowStopInstances
+              Effect: Allow
+              Action: ec2:StopInstances
+              Resource: "*"
+
+  # 🚀 EventBridge Rule for Auto-Stop
+  AutoStopEC2Schedule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: 'rate(15 minutes)'
+      Targets:
+        - Arn: !GetAtt AutoStopEC2Function.Arn
+          Id: AutoStopEC2LambdaTarget
+    DependsOn: AutoStopEC2Function
+
+  AutoStopLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt AutoStopEC2Function.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt AutoStopEC2Schedule.Arn
+
+  # 🚀 Auto-Start Lambda Function
+  AutoStartEC2Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: autostart.lambda_handler
+      Runtime: python3.12
+      Timeout: 60
+      CodeUri: ./  # Points to the root folder where autostart.py exists
+      Policies:
+        - AmazonEC2ReadOnlyAccess
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Sid: AllowStartInstances
+              Effect: Allow
+              Action: ec2:StartInstances
+              Resource: "*"
+
+  # 🚀 EventBridge Rule for Auto-Start
+  AutoStartEC2Schedule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: 'rate(15 minutes)'
+      Targets:
+        - Arn: !GetAtt AutoStartEC2Function.Arn
+          Id: AutoStartEC2LambdaTarget
+    DependsOn: AutoStartEC2Function
+
+  AutoStartLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt AutoStartEC2Function.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt AutoStartEC2Schedule.Arn
